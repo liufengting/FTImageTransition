@@ -22,7 +22,7 @@ open class FTZoomTransitionConfig {
     }()
     
     static func maxAnimationDuriation() -> TimeInterval {
-        return 0.3
+        return 0.5
     }
     
     public convenience init(sourceView: UIView, image: UIImage?, targetFrame: CGRect) {
@@ -63,20 +63,24 @@ open class FTImageTransition: NSObject, UIViewControllerTransitioningDelegate, F
         animator.delegate = self
         return animator
     }()
+    
     private lazy var dismissAnimator: FTImageTransitionDismissAnimator = {
         let animator = FTImageTransitionDismissAnimator()
         animator.delegate = self
         return animator
     }()
+    
     public lazy var panDismissAnimator: FTImageTransitionPanDismissAnimator = {
         let animator = FTImageTransitionPanDismissAnimator()
+        animator.dismissAnimator = dismissAnimator
         animator.delegate = self
         return animator
     }()
+    
     public weak var delegate: FTImageTransitionDelegate?
-
-    public func wirePanDismissToViewController(_ viewController: UIViewController!, for view: UIView) {
-        self.panDismissAnimator.wirePanDismissToViewController(viewController: viewController, for: view)
+    
+    public func wirePanDismissToViewController(_ viewController: UIViewController!) {
+        self.panDismissAnimator.wirePanDismissToViewController(viewController: viewController)
     }
     
     //    MARK: - UIViewControllerTransitioningDelegate
@@ -91,7 +95,6 @@ open class FTImageTransition: NSObject, UIViewControllerTransitioningDelegate, F
     
     public func interactionControllerForDismissal(using animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
         if panDismissAnimator.interactionInProgress == true {
-            panDismissAnimator.dismissAnimator = dismissAnimator
             return panDismissAnimator
         } else {
             return nil
@@ -105,7 +108,7 @@ open class FTImageTransition: NSObject, UIViewControllerTransitioningDelegate, F
             self.delegate?.ftImageTransitionWillStartPresent!(transition: self, transitionContext: transitionContext)
         }
     }
-
+    
     public func ftImageTransitionDidFinishPresent(transition: FTImageTransition?, transitionContext: UIViewControllerContextTransitioning) {
         if self.delegate != nil && (self.delegate!.responds(to: #selector(FTImageTransitionDelegate.ftImageTransitionDidFinishPresent(transition:transitionContext:)))) {
             self.delegate?.ftImageTransitionDidFinishPresent!(transition: self, transitionContext: transitionContext)
@@ -136,7 +139,7 @@ open class FTImageTransitionPresentAnimator: NSObject, UIViewControllerAnimatedT
     
     public weak var config : FTZoomTransitionConfig!
     public weak var delegate: FTImageTransitionDelegate?
-
+    
     public func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval{
         return max(FTZoomTransitionConfig.maxAnimationDuriation(), config.animationDuriation)
     }
@@ -161,7 +164,7 @@ open class FTImageTransitionPresentAnimator: NSObject, UIViewControllerAnimatedT
         toVC.view.alpha = 0
         self.config.sourceView?.isHidden = true
         self.config.transitionImageView.frame = config.sourceFrame
-
+        
         UIView.animateKeyframes(withDuration: transitionDuration(using: transitionContext),
                                 delay: 0,
                                 options: UIViewKeyframeAnimationOptions.calculationModeCubic,
@@ -170,13 +173,13 @@ open class FTImageTransitionPresentAnimator: NSObject, UIViewControllerAnimatedT
                                         self.config.transitionImageView.frame = self.config.targetFrame
                                         fromVC.view.alpha = 0
                                     })
-
+                                    
                                     UIView.addKeyframe(withRelativeStartTime: 0.9, relativeDuration: 0.1, animations: {
                                         toVC.view.alpha = 1
                                     })
         }, completion: { (completed) -> () in
             fromVC.view.alpha = transitionContext.transitionWasCancelled ? 1.0 : 0.0
-            self.config.sourceView?.isHidden = (transitionContext.transitionWasCancelled)
+            self.config.sourceView?.isHidden = false
             self.config.transitionImageView.alpha = transitionContext.transitionWasCancelled ? 1.0 : 0.0
             self.config.transitionImageView.isHidden = !(transitionContext.transitionWasCancelled)
             transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
@@ -193,7 +196,7 @@ open class FTImageTransitionDismissAnimator: NSObject, UIViewControllerAnimatedT
     
     public weak var config : FTZoomTransitionConfig!
     public weak var delegate: FTImageTransitionDelegate?
-
+    
     public func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval{
         return max(FTZoomTransitionConfig.maxAnimationDuriation(), config.animationDuriation)
     }
@@ -240,7 +243,6 @@ open class FTImageTransitionDismissAnimator: NSObject, UIViewControllerAnimatedT
                 container.bringSubview(toFront: fromVC.view)
             }
             self.config.transitionImageView.isHidden = transitionContext.transitionWasCancelled
-            self.config.sourceView?.isHidden = transitionContext.transitionWasCancelled
             transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
             if (transitionContext.transitionWasCancelled) {
                 if (self.delegate != nil && (self.delegate!.responds(to: #selector(FTImageTransitionDelegate.ftImageTransitionDidCancelDismiss(transition:transitionContext:))))) {
@@ -262,13 +264,13 @@ open class FTImageTransitionPanDismissAnimator : UIPercentDrivenInteractiveTrans
     public weak var viewController: UIViewController?
     fileprivate var shouldCompleteTransition = false
     public weak var delegate: FTImageTransitionDelegate?
-
+    
     lazy var panGesture : UIPanGestureRecognizer = {
         let gesture = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
         return gesture
     }()
-
-    public func wirePanDismissToViewController(viewController: UIViewController, for view: UIView) {
+    
+    public func wirePanDismissToViewController(viewController: UIViewController) {
         self.viewController = viewController
         preparePanGestureRecognizerInView(viewController.view)
     }
@@ -291,6 +293,7 @@ open class FTImageTransitionPanDismissAnimator : UIPercentDrivenInteractiveTrans
         viewController?.view.isHidden = false
         cancel()
     }
+    
     public func handleDismissFinish() {
         interactionInProgress = false
         viewController?.view.isHidden = true
@@ -301,7 +304,7 @@ open class FTImageTransitionPanDismissAnimator : UIPercentDrivenInteractiveTrans
     fileprivate func preparePanGestureRecognizerInView(_ view: UIView) {
         view.addGestureRecognizer(self.panGesture)
     }
-
+    
     @objc public func handlePanGesture(_ gestureRecognizer: UIPanGestureRecognizer) {
         let translation = gestureRecognizer.translation(in: gestureRecognizer.view!)
         var progress: CGFloat = 0.0
@@ -338,7 +341,6 @@ open class FTImageTransitionPanDismissAnimator : UIPercentDrivenInteractiveTrans
     }
     
     func finishAnimation() {
-        self.dismissAnimator.config.sourceView?.isHidden = true
         UIView.animate(withDuration: 0.3,
                        delay: 0.0,
                        options: UIViewAnimationOptions.curveEaseIn,
@@ -346,7 +348,6 @@ open class FTImageTransitionPanDismissAnimator : UIPercentDrivenInteractiveTrans
                         self.dismissAnimator.config.transitionImageView.frame = self.dismissAnimator.config.sourceFrame
         }) { (complete) in
             self.dismissAnimator.config.transitionImageView.isHidden = true
-            self.dismissAnimator.config.sourceView?.isHidden = false
         }
     }
 }
