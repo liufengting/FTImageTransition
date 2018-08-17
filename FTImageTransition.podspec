@@ -2,7 +2,7 @@
 Pod::Spec.new do |s|
 
   s.name         = "FTImageTransition"
-  s.version      = "0.0.4"
+  s.version      = "0.0.5"
   s.summary      = "Customize the present animation"
   s.description  = <<-DESC
     	FTImageTransition. Customize the present animation with simple api.
